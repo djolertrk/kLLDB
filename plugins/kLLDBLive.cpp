@@ -288,6 +288,7 @@ public:
 namespace lldb {
 bool PluginInitialize(SBDebugger debugger) {
   SBCommandInterpreter interpreter = debugger.GetCommandInterpreter();
+  debugger.SetPrompt("kLLDB> ");
 
   // Create a multiword command group named "linux" for Linux kernel helper
   // commands
