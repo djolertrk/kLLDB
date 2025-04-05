@@ -31,8 +31,59 @@ cmake ../kLLDB/ -DCMAKE_BUILD_TYPE=Relase -DLLVM_DIR=/usr/lib/llvm-19/lib/cmake/
 
 ### Offline debugging - kdump
 
-TBD
- 
+For the purpose of debugging a `kdump` file, we added an LLDB plugin, that is a wrapper around [libkdumpfile](https://github.com/ptesarik/libkdumpfile).
+Lets analyze a crash file from Linux kernel 5.15 and see some `kdump` specific options:
+
+```
+$ lldb
+(lldb) target create vmlinux
+Current executable set to '/path/to/KoviD/kovid/vmlinux' (x86_64).
+(lldb) plugin load /path/to/NewKLLDB/build/lib/libkLLDBOffline.so
+kLLDBOffline plugin loaded.
+kLLDB> kdump open ./crash.file
+Opened ./crash.file
+kLLDB> kdump info
+  Crash File: ./crash.file
+  Release: 5.15.0
+  Arch: x86_64
+  Crash Time: 2025-03-26 08:15:11
+  BUILD-ID: 5854168ecc422202ede0880ac960351c37b57faa
+  PAGESIZE: 4096
+  Crash PID: 260 CPU0
+kLLDB> kdump load-lkm kovid.ko
+kovid.ko loaded at 0xffffffffc0000000
+kLLDB> kdump bugpoint
+Instructon pointer at rip=0xffffffffc0003dd5
+Blame function: kv_reset_tainted+5
+kLLDB> kdump source-dir-map /kovid/ /path/to/KoviD/kovid
+Mapped source directory '/kovid/' -> '/path/to/KoviD/kovid'
+kLLDB> list kv_reset_tainted
+File: /kovid/src/sys.c
+   1226 
+   1227     if (!within_module(parent_ip, THIS_MODULE))
+   1228         regs->ip = (unsigned long)hook->function;
+   1229 }
+   1230 
+   1231 int kv_reset_tainted(unsigned long *tainted_ptr)
+   1232 {
+   1233     return test_and_clear_bit(TAINT_UNSIGNED_MODULE, tainted_ptr);
+   1234 }
+   1235 
+   1236 #ifdef __x86_64__
+   1237 #define _sys_arch(s) "__x64_" s
+   1238 #else
+   1239 #define _sys_arch(s) s
+kLLDB> kdump registers
+ CPU: 0, PID: 260
+  RAX=0x0000000000000000  RBX=0xFFFFFFFFC000C020  RCX=0x0000000000000000  RDX=0x0000000000000000
+  RSI=0xFFFF88807FC17470  RDI=0x0000000000000000  RBP=0xFFFFFFFFC000EB60  RSP=0xFFFFC900000B3DC0
+   R8=0xFFFFFFFF82741968   R9=0x00000000FFFFDFFF  R10=0xFFFFFFFF82661980  R11=0xFFFFFFFF82661980
+  R12=0xFFFF888005A98100  R13=0x000055C63C7FD45C  R14=0x0000000000000003  R15=0x0000000000000000
+  RIP=0xFFFFFFFFC0003DD5  CS=0x0010  EFLAGS=0x00000246  SS=0x0018
+  ORIG_RAX=0xFFFFFFFFFFFFFFFF
+kLLDB> q
+```
+
 ### Live debugging
 
 In one terminal, run qemu as:
